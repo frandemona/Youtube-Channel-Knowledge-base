@@ -1,0 +1,39 @@
+[project]
+name = "ytkb"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Alberto", email = "alberto@mondey.co" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.137.2",
+    "fastembed>=0.8.0",
+    "faster-whisper>=1.2.1",
+    "lancedb>=0.33.0",
+    "openai>=2.43.0",
+    "python-dotenv>=1.2.2",
+    "requests>=2.34.2",
+    "typer>=0.25.1",
+    "uvicorn[standard]>=0.49.0",
+    "yt-dlp>=2026.6.9",
+]
+
+[project.scripts]
+kb = "ytkb.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.15,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
