@@ -33,7 +33,9 @@ def _yt_dlp_download(video_id: str, languages: list[str]) -> dict | None:
     url = f"https://youtu.be/{video_id}"
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
-    subs = {**(info.get("subtitles") or {}), **(info.get("automatic_captions") or {})}
+    # Creator-uploaded subtitles take priority over auto-captions (spec §5):
+    # spread auto-captions first so manual subtitles override them per language.
+    subs = {**(info.get("automatic_captions") or {}), **(info.get("subtitles") or {})}
     for lang in languages:
         tracks = subs.get(lang) or subs.get(lang.split("-")[0])
         if not tracks:
