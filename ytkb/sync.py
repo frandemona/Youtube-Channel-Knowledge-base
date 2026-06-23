@@ -3,13 +3,15 @@ from dataclasses import asdict
 
 from .channel import ChannelInfo, ChannelFilters, resolve_channel, list_videos
 from .config import Config
-from .db import connect, upsert_video, videos_by_state, count_by_state, record_run, VideoState
+from .db import connect, upsert_video, videos_by_state, count_by_state, record_run, VideoState, set_state
 from .embeddings import Embedder
 from .llm import LLMClient
-from .models import RunSummary, VideoMeta
+from .models import RunSummary, VideoMeta, Segment
 from .paths import ChannelPaths, slugify, list_channel_slugs
 from .pipeline import ChannelContext, process_video
 from .store import ChannelStore
+from .chunking import chunk_segments
+from .transcripts import load_raw
 
 PROCESS_STATES = [VideoState.DISCOVERED, VideoState.FAILED_FETCH, VideoState.FAILED_EMBED]
 RETRY_STATES = [VideoState.FAILED_FETCH, VideoState.FAILED_EMBED, VideoState.NO_TRANSCRIPT]
@@ -114,3 +116,39 @@ def channel_status(cfg, slug) -> dict:
 
 def list_channels(cfg) -> list[str]:
     return list_channel_slugs(cfg.data_dir)
+
+
+def reindex_video(ctx: ChannelContext, row) -> VideoState | None:
+    vid = row["video_id"]
+    seg_path = ctx.paths.clean_segments_path(vid)
+    if seg_path.exists():
+        segments = load_raw(seg_path)
+    elif ctx.paths.clean_path(vid).exists():
+        # Legacy channels indexed before clean.json: text only, timestamps unavailable.
+        segments = [Segment(0.0, 0.0, ctx.paths.clean_path(vid).read_text())]
+    else:
+        return None
+    try:
+        chunks = chunk_segments(vid, segments, ctx.cfg.chunk_tokens, ctx.cfg.chunk_overlap)
+        ctx.store.add(chunks, title_of={vid: row["title"]})
+    except Exception as e:
+        set_state(ctx.conn, vid, VideoState.FAILED_EMBED, error=str(e))
+        return VideoState.FAILED_EMBED
+    return VideoState.INDEXED
+
+
+def reindex_channel(cfg, slug, *, process=None) -> RunSummary:
+    process = process or reindex_video
+    ctx = build_context(cfg, slug)
+    ctx.store.reset()
+    summary = RunSummary()
+    for row in videos_by_state(ctx.conn, [VideoState.INDEXED]):
+        res = process(ctx, row)
+        if res == VideoState.INDEXED:
+            summary.done += 1
+        elif res is None:
+            summary.skipped += 1
+        else:
+            summary.failed += 1
+    record_run(ctx.conn, summary, "reindex")
+    return summary
