@@ -70,11 +70,11 @@ class ChannelStore:
     def list_videos(self, contains: str | None = None) -> list[dict]:
         if contains:
             rows = self.conn.execute(
-                "SELECT video_id, title, upload_date FROM videos WHERE title LIKE ?",
+                "SELECT video_id, title, upload_date FROM videos WHERE title LIKE ? AND state='indexed'",
                 (f"%{contains}%",),
             ).fetchall()
         else:
             rows = self.conn.execute(
-                "SELECT video_id, title, upload_date FROM videos"
+                "SELECT video_id, title, upload_date FROM videos WHERE state='indexed'"
             ).fetchall()
         return [dict(r) for r in rows]

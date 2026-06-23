@@ -1,5 +1,5 @@
 from ytkb.paths import ChannelPaths
-from ytkb.db import connect, upsert_video
+from ytkb.db import connect, upsert_video, set_state, VideoState
 from ytkb.embeddings import Embedder
 from ytkb.store import ChannelStore
 from ytkb.models import VideoMeta, Chunk
@@ -22,6 +22,7 @@ def build_store(tmp_path):
     paths.ensure()
     conn = connect(paths.db)
     upsert_video(conn, VideoMeta("v1", "Cofounders", 600, "20240101", "https://youtu.be/v1"))
+    set_state(conn, "v1", VideoState.INDEXED)
     store = ChannelStore(paths, conn, Embedder("fake", backend=HashBackend()))
     chunks = [
         Chunk("v1", 0, 10.0, "how to find a cofounder for your startup"),
