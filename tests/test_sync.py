@@ -141,6 +141,27 @@ def test_reindex_video_skips_when_no_clean_files(tmp_path):
     assert sync.reindex_video(ctx, get_video(conn, "v9")) is None
 
 
+def test_reindex_video_empty_transcript_is_skipped(tmp_path):
+    from ytkb.paths import ChannelPaths
+    from ytkb.db import connect, upsert_video, set_state, get_video
+    from ytkb.embeddings import Embedder
+    from ytkb.store import ChannelStore
+    from ytkb.pipeline import ChannelContext
+    from ytkb.transcripts import save_raw
+    from tests.test_store import HashBackend
+    cfg = load_config(tmp_path)
+    paths = ChannelPaths.for_slug(cfg.data_dir, "c"); paths.ensure()
+    conn = connect(paths.db)
+    upsert_video(conn, VideoMeta("v1", "Empty", 600, "20240101", "https://youtu.be/v1"))
+    set_state(conn, "v1", VideoState.INDEXED)
+    save_raw(paths.clean_segments_path("v1"), [])  # cleaned transcript has no segments
+    store = ChannelStore(paths, conn, Embedder("fake", backend=HashBackend()))
+    ctx = ChannelContext(paths=paths, conn=conn, cfg=cfg, llm=None, store=store,
+                         filters=ChannelFilters(), whisper_enabled=True)
+    assert sync.reindex_video(ctx, get_video(conn, "v1")) is None
+    assert store.keyword_search("anything", 5) == []
+
+
 def test_reindex_channel_resets_processes_indexed_only_and_logs(tmp_path):
     cfg = load_config(tmp_path)
     slug = sync.add_channel(cfg, "u", ChannelFilters(), resolver=lambda url, **k: info())

@@ -125,11 +125,13 @@ def reindex_video(ctx: ChannelContext, row) -> VideoState | None:
         segments = load_raw(seg_path)
     elif ctx.paths.clean_path(vid).exists():
         # Legacy channels indexed before clean.json: text only, timestamps unavailable.
-        segments = [Segment(0.0, 0.0, ctx.paths.clean_path(vid).read_text())]
+        segments = [Segment(0.0, 0.0, ctx.paths.clean_path(vid).read_text(encoding="utf-8"))]
     else:
         return None
     try:
         chunks = chunk_segments(vid, segments, ctx.cfg.chunk_tokens, ctx.cfg.chunk_overlap)
+        if not chunks:
+            return None
         ctx.store.add(chunks, title_of={vid: row["title"]})
     except Exception as e:
         set_state(ctx.conn, vid, VideoState.FAILED_EMBED, error=str(e))
