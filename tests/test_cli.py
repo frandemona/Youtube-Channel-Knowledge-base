@@ -50,3 +50,17 @@ def test_status_prints_counts(monkeypatch, tmp_path):
     result = runner.invoke(cli.app, ["status", "y-combinator"])
     assert result.exit_code == 0
     assert "indexed" in result.stdout and "3" in result.stdout
+
+
+def test_reindex_invokes_sync(monkeypatch, tmp_path):
+    monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
+    captured = {}
+    def fake_reindex(cfg, slug):
+        captured["slug"] = slug
+        return RunSummary(done=3, failed=0, skipped=1)
+    monkeypatch.setattr(cli.sync, "reindex_channel", fake_reindex)
+    result = runner.invoke(cli.app, ["reindex", "y-combinator"])
+    assert result.exit_code == 0
+    assert captured["slug"] == "y-combinator"
+    assert "reindexed=3" in result.stdout
+    assert "skipped=1" in result.stdout

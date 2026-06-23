@@ -68,6 +68,16 @@ def retry(slug: str):
     typer.echo(f"[{slug}] done={summary.done} failed={summary.failed} skipped={summary.skipped}")
 
 
+@app.command()
+def reindex(slug: str = typer.Argument(None), all: bool = typer.Option(False, "--all")):
+    """Rebuild a channel's index from local transcripts (e.g. after changing the embedding model)."""
+    cfg = load_config()
+    slugs = sync.list_channels(cfg) if all else [slug]
+    for s in slugs:
+        summary = sync.reindex_channel(cfg, s)
+        typer.echo(f"[{s}] reindexed={summary.done} failed={summary.failed} skipped={summary.skipped}")
+
+
 @app.command(name="list")
 def list_cmd():
     cfg = load_config()
