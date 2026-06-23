@@ -1,0 +1,11 @@
+# Copy to data/config.toml and edit as needed.
+chat_model = "anthropic/claude-haiku-4.5"
+adstrip_model = "anthropic/claude-haiku-4.5"
+embedding_model = "BAAI/bge-small-en-v1.5"
+chunk_tokens = 500
+chunk_overlap = 80
+languages = ["en"]
+whisper_enabled_default = true
+whisper_model = "base"
+request_delay = 1.0
+top_k = 6
