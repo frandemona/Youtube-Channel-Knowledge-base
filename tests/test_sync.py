@@ -184,3 +184,43 @@ def test_reindex_channel_resets_processes_indexed_only_and_logs(tmp_path):
     conn2 = connect(ChannelPaths.for_slug(cfg.data_dir, slug).db)
     kinds = [r["kind"] for r in conn2.execute("SELECT kind FROM runs").fetchall()]
     assert "reindex" in kinds
+
+
+def test_retry_reprocesses_stranded_intermediate_state(tmp_path):
+    # A video interrupted mid-pipeline (e.g. transcript_fetched, no error) must be
+    # recovered by retry/sync, not stranded forever.
+    from ytkb.db import upsert_video, set_state
+    cfg = load_config(tmp_path)
+    slug = sync.add_channel(cfg, "u", ChannelFilters(), resolver=lambda url, **k: info())
+    ctx = sync.build_context(cfg, slug)
+    upsert_video(ctx.conn, VideoMeta("a", "A", 600, "20240101", "https://youtu.be/a"))
+    set_state(ctx.conn, "a", VideoState.TRANSCRIPT_FETCHED)
+
+    processed = []
+    def fake_process(ctx, meta, **k):
+        processed.append(meta.video_id)
+        set_state(ctx.conn, meta.video_id, VideoState.INDEXED)
+        return VideoState.INDEXED
+
+    summary = sync.retry_channel(cfg, slug, process=fake_process)
+    assert "a" in processed
+    assert summary.done == 1
+
+
+def test_sync_reprocesses_stranded_intermediate_state(tmp_path):
+    from ytkb.db import upsert_video, set_state
+    cfg = load_config(tmp_path)
+    slug = sync.add_channel(cfg, "u", ChannelFilters(), resolver=lambda url, **k: info())
+    ctx = sync.build_context(cfg, slug)
+    upsert_video(ctx.conn, VideoMeta("a", "A", 600, "20240101", "https://youtu.be/a"))
+    set_state(ctx.conn, "a", VideoState.AD_STRIPPED)  # stranded after ad-strip
+
+    processed = []
+    def fake_process(ctx, meta, **k):
+        processed.append(meta.video_id)
+        set_state(ctx.conn, meta.video_id, VideoState.INDEXED)
+        return VideoState.INDEXED
+
+    # empty listing: the stranded video isn't in the channel listing, only in the DB
+    sync.sync_channel(cfg, slug, lister=lambda url, f, **k: [], process=fake_process)
+    assert "a" in processed

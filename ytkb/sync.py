@@ -13,8 +13,17 @@ from .store import ChannelStore
 from .chunking import chunk_segments
 from .transcripts import load_raw
 
-PROCESS_STATES = [VideoState.DISCOVERED, VideoState.FAILED_FETCH, VideoState.FAILED_EMBED]
-RETRY_STATES = [VideoState.FAILED_FETCH, VideoState.FAILED_EMBED, VideoState.NO_TRANSCRIPT]
+# Videos interrupted mid-pipeline land in one of these intermediate states with no
+# error; without re-including them, sync/retry would strand them forever.
+INTERMEDIATE_STATES = [
+    VideoState.TRANSCRIPT_FETCHED, VideoState.WHISPER_TRANSCRIBED, VideoState.AD_STRIPPED,
+]
+PROCESS_STATES = [
+    VideoState.DISCOVERED, VideoState.FAILED_FETCH, VideoState.FAILED_EMBED,
+] + INTERMEDIATE_STATES
+RETRY_STATES = [
+    VideoState.FAILED_FETCH, VideoState.FAILED_EMBED, VideoState.NO_TRANSCRIPT,
+] + INTERMEDIATE_STATES
 
 
 def save_channel(cfg: Config, slug: str, info: ChannelInfo, filters: ChannelFilters) -> None:

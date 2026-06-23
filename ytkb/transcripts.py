@@ -29,6 +29,10 @@ def _yt_dlp_download(video_id: str, languages: list[str]) -> dict | None:
         "writeautomaticsub": True,
         "subtitlesformat": "json3",
         "subtitleslangs": languages,
+        # Rate-limit politeness: space out requests and let yt-dlp retry transient
+        # throttling (HTTP 429) with its own backoff instead of failing immediately.
+        "sleep_interval_requests": 1,
+        "extractor_retries": 5,
     }
     url = f"https://youtu.be/{video_id}"
     with YoutubeDL(opts) as ydl:
