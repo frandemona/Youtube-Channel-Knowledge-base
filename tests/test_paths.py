@@ -14,6 +14,7 @@ def test_channel_paths_layout(tmp_path: Path):
     assert cp.db == cp.dir / "videos.db"
     assert cp.raw_path("abc123") == cp.transcripts_dir / "abc123.raw.json"
     assert cp.clean_path("abc123") == cp.transcripts_dir / "abc123.clean.txt"
+    assert cp.clean_segments_path("abc123") == cp.transcripts_dir / "abc123.clean.json"
 
 
 def test_list_channel_slugs(tmp_path: Path):

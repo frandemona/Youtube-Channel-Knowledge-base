@@ -6,6 +6,7 @@ from ytkb.channel import ChannelFilters
 from ytkb.pipeline import ChannelContext, process_video
 from ytkb.models import VideoMeta, Segment
 from ytkb.config import load_config
+from ytkb.transcripts import load_raw
 from tests.test_store import HashBackend
 
 
@@ -56,3 +57,18 @@ def test_pipeline_whisper_fallback(tmp_path):
         strip=lambda vid, s, llm, cfg, **k: (s, "none"),
     )
     assert state == VideoState.INDEXED
+
+
+def test_pipeline_writes_timestamped_clean_json(tmp_path):
+    ctx = make_ctx(tmp_path)
+    upsert_video(ctx.conn, meta())
+    segs = [Segment(10.0, 12.0, "find a cofounder"), Segment(12.0, 15.0, "this is sponsored")]
+    process_video(
+        ctx, meta(),
+        fetch=lambda vid, langs: segs,
+        strip=lambda vid, s, llm, cfg, **k: ([segs[0]], "llm"),
+    )
+    clean_json = ctx.paths.clean_segments_path("v1")
+    assert clean_json.exists()
+    loaded = load_raw(clean_json)
+    assert loaded == [Segment(10.0, 12.0, "find a cofounder")]  # cleaned + timestamp preserved

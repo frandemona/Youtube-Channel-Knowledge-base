@@ -50,6 +50,9 @@ class ChannelPaths:
     def clean_path(self, video_id: str) -> Path:
         return self.transcripts_dir / f"{video_id}.clean.txt"
 
+    def clean_segments_path(self, video_id: str) -> Path:
+        return self.transcripts_dir / f"{video_id}.clean.json"
+
     def ensure(self) -> None:
         self.transcripts_dir.mkdir(parents=True, exist_ok=True)
         self.vectors_dir.mkdir(parents=True, exist_ok=True)

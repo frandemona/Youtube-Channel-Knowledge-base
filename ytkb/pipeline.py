@@ -57,6 +57,7 @@ def process_video(ctx: ChannelContext, meta: VideoMeta, *, fetch=None, whisper=N
     ctx.paths.clean_path(vid).write_text(
         " ".join(s.text for s in clean_segments), encoding="utf-8"
     )
+    transcripts.save_raw(ctx.paths.clean_segments_path(vid), clean_segments)
     set_state(ctx.conn, vid, VideoState.AD_STRIPPED)
 
     # 3. chunk + index
