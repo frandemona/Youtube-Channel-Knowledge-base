@@ -56,3 +56,15 @@ def test_insert_chunks_and_fts(tmp_path):
     ).fetchall()
     assert rows[0]["video_id"] == "v1"
     assert rows[0]["start"] == 12.0
+
+
+def test_clear_all_chunks_empties_content_and_fts(tmp_path):
+    from ytkb.db import clear_all_chunks
+    conn = connect(tmp_path / "videos.db")
+    upsert_video(conn, make_meta("v1"))
+    insert_chunks(conn, [Chunk(video_id="v1", idx=0, start=1.0, text="cofounder advice")], {"v1": "T"})
+    clear_all_chunks(conn)
+    assert conn.execute("SELECT COUNT(*) c FROM chunks").fetchone()["c"] == 0
+    # FTS index is empty too -> a prior match now returns nothing
+    rows = conn.execute("SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH ?", ("cofounder",)).fetchall()
+    assert rows == []

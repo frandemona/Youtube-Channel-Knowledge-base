@@ -122,6 +122,13 @@ def delete_video_chunks(conn, video_id: str) -> None:
     conn.commit()
 
 
+def clear_all_chunks(conn) -> None:
+    # FTS5 external-content: clear the index first, then the content table.
+    conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES('delete-all')")
+    conn.execute("DELETE FROM chunks")
+    conn.commit()
+
+
 def insert_chunks(conn, chunks: list[Chunk], title_of: dict[str, str]) -> None:
     for ch in chunks:
         cur = conn.execute(

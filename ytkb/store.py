@@ -1,6 +1,6 @@
 import lancedb
 
-from .db import delete_video_chunks, insert_chunks
+from .db import clear_all_chunks, delete_video_chunks, insert_chunks
 from .embeddings import Embedder
 from .models import Chunk, ChunkHit
 from .paths import ChannelPaths
@@ -43,6 +43,12 @@ class ChannelStore:
         else:
             table.add(rows)
         insert_chunks(self.conn, chunks, title_of)
+
+    def reset(self) -> None:
+        """Drop the entire index for this channel (vectors + chunks + FTS). Idempotent."""
+        if TABLE in self._db.table_names():
+            self._db.drop_table(TABLE)
+        clear_all_chunks(self.conn)
 
     def keyword_search(self, query: str, k: int) -> list[ChunkHit]:
         rows = self.conn.execute(

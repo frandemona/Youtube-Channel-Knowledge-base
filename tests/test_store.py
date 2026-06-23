@@ -80,3 +80,14 @@ def test_read_around_missing_clean_file_no_crash(tmp_path):
     store = build_store(tmp_path)
     result = store.read_around("nonexistent_vid", None)
     assert result == ""
+
+
+def test_reset_clears_index(tmp_path):
+    store = build_store(tmp_path)
+    assert store.keyword_search("cofounder", 5) != []
+    assert store.semantic_search("cofounder", 5) != []
+    store.reset()
+    assert store.keyword_search("cofounder", 5) == []
+    assert store.semantic_search("cofounder", 5) == []
+    assert store._table() is None
+    store.reset()  # idempotent: no error when already empty / table absent
