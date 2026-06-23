@@ -52,7 +52,11 @@ def process_video(ctx: ChannelContext, meta: VideoMeta, *, fetch=None, whisper=N
     transcripts.save_raw(ctx.paths.raw_path(vid), segments)
 
     # 2. ad stripping
-    clean_segments, method = strip(vid, segments, ctx.llm, ctx.cfg)
+    try:
+        clean_segments, method = strip(vid, segments, ctx.llm, ctx.cfg)
+    except Exception as e:
+        set_state(ctx.conn, vid, VideoState.FAILED_EMBED, error=f"adstrip: {e}")
+        return VideoState.FAILED_EMBED
     set_ad_method(ctx.conn, vid, method)
     ctx.paths.clean_path(vid).write_text(
         " ".join(s.text for s in clean_segments), encoding="utf-8"

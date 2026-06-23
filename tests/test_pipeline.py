@@ -72,3 +72,18 @@ def test_pipeline_writes_timestamped_clean_json(tmp_path):
     assert clean_json.exists()
     loaded = load_raw(clean_json)
     assert loaded == [Segment(10.0, 12.0, "find a cofounder")]  # cleaned + timestamp preserved
+
+
+def test_pipeline_adstrip_failure_sets_failed_embed(tmp_path):
+    # A failure in the ad-strip step (e.g. SponsorBlock/LLM error) must mark just
+    # this video FAILED_EMBED (retryable), not crash the whole sync.
+    ctx = make_ctx(tmp_path)
+    upsert_video(ctx.conn, meta())
+    segs = [Segment(0, 5, "hello")]
+
+    def boom_strip(vid, s, llm, cfg, **k):
+        raise RuntimeError("sponsorblock down")
+
+    state = process_video(ctx, meta(), fetch=lambda vid, langs: segs, strip=boom_strip)
+    assert state == VideoState.FAILED_EMBED
+    assert get_video(ctx.conn, "v1")["state"] == "failed_embed"

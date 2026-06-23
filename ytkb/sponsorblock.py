@@ -7,7 +7,8 @@ CATEGORIES = ("sponsor", "selfpromo")
 
 
 def _http_get(url: str, params: dict):
-    resp = requests.get(url, params=params, timeout=15)
+    # (connect, read) timeouts: fail reasonably fast if SponsorBlock is slow/unreachable.
+    resp = requests.get(url, params=params, timeout=(5, 10))
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -16,10 +17,15 @@ def _http_get(url: str, params: dict):
 
 def get_segments(video_id: str, *, http_get=None) -> list[tuple[float, float]]:
     http_get = http_get or _http_get
-    data = http_get(
-        API,
-        {"videoID": video_id, "categories": '["sponsor","selfpromo"]'},
-    )
+    try:
+        data = http_get(
+            API,
+            {"videoID": video_id, "categories": '["sponsor","selfpromo"]'},
+        )
+    except (requests.RequestException, ValueError):
+        # SponsorBlock is best-effort: any network/parse failure means "no data",
+        # so ad-stripping falls through to the LLM/keep-all path instead of crashing.
+        return []
     if not data:
         return []
     out = []

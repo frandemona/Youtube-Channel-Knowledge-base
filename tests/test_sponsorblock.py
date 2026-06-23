@@ -24,3 +24,14 @@ def test_get_segments_parses_categories():
 
 def test_get_segments_handles_no_data():
     assert get_segments("v1", http_get=lambda url, params: None) == []
+
+
+def test_get_segments_swallows_network_errors():
+    # SponsorBlock is best-effort: a network failure must degrade to "no data",
+    # not raise (which would crash the whole sync).
+    import requests
+
+    def boom(url, params):
+        raise requests.exceptions.ReadTimeout("slow")
+
+    assert get_segments("v1", http_get=boom) == []
