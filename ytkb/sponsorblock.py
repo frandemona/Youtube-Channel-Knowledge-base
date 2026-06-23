@@ -2,7 +2,9 @@ import requests
 
 from .models import Segment
 
-API = "https://api.sponsor.ajay.app/api/skipSegments"
+# Canonical SponsorBlock host (Cloudflare-fronted, reliable). The `api.` origin
+# subdomain exists but is frequently slow/unreachable and caused read timeouts.
+API = "https://sponsor.ajay.app/api/skipSegments"
 CATEGORIES = ("sponsor", "selfpromo")
 
 
