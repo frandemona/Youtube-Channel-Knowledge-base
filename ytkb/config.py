@@ -1,6 +1,6 @@
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import dotenv_values

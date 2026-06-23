@@ -6,7 +6,7 @@ from .config import Config
 from .db import connect, upsert_video, videos_by_state, count_by_state, record_run, VideoState
 from .embeddings import Embedder
 from .llm import LLMClient
-from .models import RunSummary
+from .models import RunSummary, VideoMeta
 from .paths import ChannelPaths, slugify, list_channel_slugs
 from .pipeline import ChannelContext, process_video
 from .store import ChannelStore
@@ -69,11 +69,9 @@ def sync_channel(cfg, slug, *, dry_run=False, lister=None, process=None) -> RunS
 
     videos = lister(info.uploads_url, filters)
     summary = RunSummary(new=0)
-    new_ids = []
     for meta in videos:
         if ctx.conn.execute("SELECT 1 FROM videos WHERE video_id=?", (meta.video_id,)).fetchone() is None:
             summary.new += 1
-            new_ids.append(meta.video_id)
         upsert_video(ctx.conn, meta)
 
     if dry_run:
@@ -86,7 +84,7 @@ def sync_channel(cfg, slug, *, dry_run=False, lister=None, process=None) -> RunS
     for row in todo:
         meta = by_id.get(row["video_id"])
         if meta is None:
-            continue
+            meta = VideoMeta(row["video_id"], row["title"], row["duration"], row["upload_date"], row["url"])
         results.append(process(ctx, meta))
     s = _summarize(results)
     s.new = summary.new
@@ -99,7 +97,6 @@ def retry_channel(cfg, slug, *, process=None) -> RunSummary:
     info, filters = load_channel(cfg, slug)
     ctx = build_context(cfg, slug)
     todo = videos_by_state(ctx.conn, RETRY_STATES)
-    from .models import VideoMeta
     results = []
     for row in todo:
         meta = VideoMeta(row["video_id"], row["title"], row["duration"], row["upload_date"], row["url"])

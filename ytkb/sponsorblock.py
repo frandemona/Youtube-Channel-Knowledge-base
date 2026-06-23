@@ -17,7 +17,7 @@ def _http_get(url: str, params: dict):
 def get_segments(video_id: str, *, http_get=None) -> list[tuple[float, float]]:
     http_get = http_get or _http_get
     data = http_get(
-        "https://api.sponsor.ajay.app/api/skipSegments",
+        API,
         {"videoID": video_id, "categories": '["sponsor","selfpromo"]'},
     )
     if not data:

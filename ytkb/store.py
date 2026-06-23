@@ -1,6 +1,6 @@
 import lancedb
 
-from .db import insert_chunks
+from .db import delete_video_chunks, insert_chunks
 from .embeddings import Embedder
 from .models import Chunk, ChunkHit
 from .paths import ChannelPaths
@@ -23,6 +23,14 @@ class ChannelStore:
     def add(self, chunks: list[Chunk], title_of: dict[str, str]) -> None:
         if not chunks:
             return
+        video_ids = {c.video_id for c in chunks}
+        table = self._table()
+        if table is not None:
+            for vid in video_ids:
+                table.delete(f"video_id = '{vid}'")
+        for vid in video_ids:
+            delete_video_chunks(self.conn, vid)
+
         vectors = self.embedder.embed([c.text for c in chunks])
         rows = [
             {"vector": vectors[i], "video_id": c.video_id, "start": c.start,
@@ -57,7 +65,8 @@ class ChannelStore:
         ]
 
     def read_around(self, video_id: str, around_ts: float | None, window: float = 90.0) -> str:
-        text = self.paths.clean_path(video_id).read_text()
+        clean = self.paths.clean_path(video_id)
+        text = clean.read_text() if clean.exists() else ""
         if around_ts is None:
             return text[:4000]
         # clean.txt stores plain text; for windowing we fall back to chunk rows near the ts.

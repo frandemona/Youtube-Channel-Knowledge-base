@@ -35,3 +35,9 @@ def test_dispatch_read_transcript():
     _, dispatch = build_tools(FakeStore(), top_k=5)
     out = dispatch("read_transcript", {"video_id": "v1", "around_ts": 12.0})
     assert "full context" in out
+
+
+def test_read_transcript_missing_video_id_returns_error():
+    _, dispatch = build_tools(FakeStore(), top_k=5)
+    out = json.loads(dispatch("read_transcript", {}))
+    assert "error" in out

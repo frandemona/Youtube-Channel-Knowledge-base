@@ -113,6 +113,15 @@ def record_run(conn, summary: RunSummary, kind: str) -> None:
     conn.commit()
 
 
+def delete_video_chunks(conn, video_id: str) -> None:
+    # FTS5 external-content table requires an explicit 'delete' per row before removing content rows.
+    rows = conn.execute("SELECT rowid, text FROM chunks WHERE video_id=?", (video_id,)).fetchall()
+    for r in rows:
+        conn.execute("INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)", (r["rowid"], r["text"]))
+    conn.execute("DELETE FROM chunks WHERE video_id=?", (video_id,))
+    conn.commit()
+
+
 def insert_chunks(conn, chunks: list[Chunk], title_of: dict[str, str]) -> None:
     for ch in chunks:
         cur = conn.execute(

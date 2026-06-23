@@ -36,6 +36,8 @@ def build_tools(store, top_k: int):
         if name == "semantic_search":
             return _hits_to_json(store.semantic_search(args["query"], top_k))
         if name == "read_transcript":
+            if not args.get("video_id"):
+                return json.dumps({"error": "read_transcript requires video_id"})
             return store.read_around(args["video_id"], args.get("around_ts"), args.get("window", 90.0))
         if name == "list_videos":
             return json.dumps(store.list_videos(args.get("contains")))

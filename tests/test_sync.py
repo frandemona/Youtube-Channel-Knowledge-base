@@ -63,3 +63,27 @@ def test_sync_skips_already_indexed(tmp_path):
     sync.sync_channel(cfg, slug, lister=lambda url, f, **k: vids,
                       process=lambda ctx, meta, **k: count.append(1))
     assert count == []  # already indexed -> not reprocessed
+
+
+def test_sync_reprocesses_prior_failed_not_in_listing(tmp_path):
+    cfg = load_config(tmp_path)
+    slug = sync.add_channel(cfg, "u", ChannelFilters(), resolver=lambda url, **k: info())
+    vids = [VideoMeta("a", "A", 600, "20240101", "https://youtu.be/a")]
+
+    def fake_process_fail(ctx, meta, **k):
+        from ytkb.db import set_state
+        set_state(ctx.conn, meta.video_id, VideoState.FAILED_FETCH)
+        return VideoState.FAILED_FETCH
+
+    sync.sync_channel(cfg, slug, lister=lambda url, f, **k: vids, process=fake_process_fail)
+
+    processed_ids = []
+
+    def fake_process_record(ctx, meta, **k):
+        processed_ids.append(meta.video_id)
+        from ytkb.db import set_state
+        set_state(ctx.conn, meta.video_id, VideoState.INDEXED)
+        return VideoState.INDEXED
+
+    sync.sync_channel(cfg, slug, lister=lambda url, f, **k: [], process=fake_process_record)
+    assert "a" in processed_ids

@@ -50,3 +50,33 @@ def test_list_videos(tmp_path):
     store = build_store(tmp_path)
     vids = store.list_videos()
     assert vids[0]["title"] == "Cofounders"
+
+
+def test_add_is_idempotent_per_video(tmp_path):
+    paths = ChannelPaths.for_slug(tmp_path, "c")
+    paths.ensure()
+    conn = connect(paths.db)
+    upsert_video(conn, VideoMeta("v1", "Cofounders", 600, "20240101", "https://youtu.be/v1"))
+    set_state(conn, "v1", VideoState.INDEXED)
+    store = ChannelStore(paths, conn, Embedder("fake", backend=HashBackend()))
+    chunks = [
+        Chunk("v1", 0, 10.0, "how to find a cofounder for your startup"),
+        Chunk("v1", 1, 40.0, "pricing your product and revenue models"),
+    ]
+    store.add(chunks, title_of={"v1": "Cofounders"})
+    store.add(chunks, title_of={"v1": "Cofounders"})
+
+    keyword_hits = store.keyword_search("cofounder", 50)
+    assert len(keyword_hits) == 1
+
+    semantic_hits = store.semantic_search("cofounder", k=1)
+    assert len(semantic_hits) == 1
+
+    # the vector table itself must not have accumulated a duplicate row per chunk
+    assert store._table().count_rows() == len(chunks)
+
+
+def test_read_around_missing_clean_file_no_crash(tmp_path):
+    store = build_store(tmp_path)
+    result = store.read_around("nonexistent_vid", None)
+    assert result == ""
