@@ -25,6 +25,10 @@ The web chat streams answers token-by-token, renders Markdown (with syntax-highl
 blocks), and lets you pick the channel from the **+** button. It loads `marked`/`DOMPurify`/
 `highlight.js` from CDN, so it needs network access (as does the agent itself).
 
+Conversations are saved to `data/conversations.db`: the sidebar lists every chat (across all
+channels), **New chat** starts a fresh one, and opening a past chat resumes it (follow-up
+questions use the prior turns). A chat's channel is fixed when it's created.
+
 ### Changing the embedding model
 Edit `embedding_model` in `data/config.toml`, then run `uv run kb reindex <slug>`. This rebuilds
 the vector index from the cleaned transcripts already on disk — no re-download, no LLM calls.
