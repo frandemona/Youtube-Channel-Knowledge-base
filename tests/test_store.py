@@ -91,3 +91,14 @@ def test_reset_clears_index(tmp_path):
     assert store.semantic_search("cofounder", 5) == []
     assert store._table() is None
     store.reset()  # idempotent: no error when already empty / table absent
+
+
+def test_keyword_search_escapes_fts_special_syntax(tmp_path):
+    # 'founder:x' is FTS5 column-filter syntax; unescaped it raised
+    # sqlite3.OperationalError: no such column: founder (surfaced to the user as an error).
+    store = build_store(tmp_path)
+    assert store.keyword_search("founder:x", 5) == []
+    # A natural-language question with punctuation must not crash either.
+    assert isinstance(store.keyword_search("How do I find a co-founder?", 5), list)
+    # Escaping must not break a normal matching term.
+    assert store.keyword_search("cofounder", 5)[0].video_id == "v1"

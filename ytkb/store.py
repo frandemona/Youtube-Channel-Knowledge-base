@@ -8,6 +8,18 @@ from .paths import ChannelPaths
 TABLE = "chunks"
 
 
+def _fts_query(query: str) -> str:
+    """Turn a free-text query into a safe FTS5 MATCH expression.
+
+    Each whitespace term is wrapped in double quotes so FTS5 treats it as a
+    literal phrase, neutralizing special syntax (``:`` column filters, ``-``,
+    ``*``, ``AND``/``OR``/``NOT``, parentheses) that would otherwise raise
+    (e.g. ``no such column: founder``). Returns "" when there are no terms.
+    """
+    terms = [t for t in query.split() if t.strip()]
+    return " ".join('"' + t.replace('"', '""') + '"' for t in terms)
+
+
 class ChannelStore:
     def __init__(self, paths: ChannelPaths, conn, embedder: Embedder):
         self.paths = paths
@@ -51,11 +63,14 @@ class ChannelStore:
         clear_all_chunks(self.conn)
 
     def keyword_search(self, query: str, k: int) -> list[ChunkHit]:
+        match = _fts_query(query)
+        if not match:
+            return []
         rows = self.conn.execute(
             """SELECT c.video_id, c.title, c.start, c.text, bm25(chunks_fts) AS score
                FROM chunks_fts f JOIN chunks c ON c.rowid=f.rowid
                WHERE chunks_fts MATCH ? ORDER BY score LIMIT ?""",
-            (query, k),
+            (match, k),
         ).fetchall()
         return [ChunkHit(r["video_id"], r["title"], r["start"], r["text"], r["score"]) for r in rows]
 
