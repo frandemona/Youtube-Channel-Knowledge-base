@@ -72,3 +72,47 @@ def test_answer_stream_forces_final_answer_when_max_steps_exhausted():
     tokens = "".join(e["text"] for e in events if e["type"] == "token")
     assert tokens == "Final answer."
     assert events[-1]["type"] == "done"
+
+
+def test_answer_stream_includes_history_in_messages():
+    from types import SimpleNamespace
+    from ytkb.agent import answer_stream
+
+    class _S:
+        def __init__(self, tokens):
+            self._t = tokens
+            self.tool_calls = []
+        def __iter__(self):
+            return iter(self._t)
+
+    captured = {}
+
+    class CapturingLLM:
+        def stream_with_tools(self, messages, model, tools):
+            captured["messages"] = messages
+            return _S(["ok"])
+
+    history = [{"role": "user", "content": "prev q"}, {"role": "assistant", "content": "prev a"}]
+    list(answer_stream("new q", "C", FakeStore(), CapturingLLM(),
+                       chat_model="m", top_k=5, history=history))
+    roles = [m["role"] for m in captured["messages"]]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert captured["messages"][-1]["content"] == "new q"
+    assert captured["messages"][1]["content"] == "prev q"
+
+
+def test_generate_title_uses_llm_then_falls_back():
+    from ytkb.agent import generate_title
+
+    class TitleLLM:
+        def complete(self, messages, model):
+            return '"Finding a co-founder"\n'
+
+    assert generate_title(TitleLLM(), "m", "How do I find a co-founder?", "Find one.") == "Finding a co-founder"
+
+    class EmptyLLM:
+        def complete(self, messages, model):
+            return "   "
+
+    # empty LLM output -> fall back to first words of the question
+    assert generate_title(EmptyLLM(), "m", "How do I find a co-founder today please", "x") == "How do I find a co-founder"

@@ -81,13 +81,12 @@ def _status_for(name: str, args_json: str) -> str:
     return "Working…"
 
 
-def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max_steps=5):
+def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, history=None, max_steps=5):
     try:
         specs, dispatch = build_tools(store, top_k)
-        messages = [
-            {"role": "system", "content": SYSTEM.format(channel=channel_title)},
-            {"role": "user", "content": question},
-        ]
+        messages = [{"role": "system", "content": SYSTEM.format(channel=channel_title)}]
+        messages += history or []
+        messages.append({"role": "user", "content": question})
         cited: dict[str, Citation] = {}
 
         answered = False
@@ -130,3 +129,23 @@ def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max
     except Exception as e:
         yield {"type": "error", "text": str(e)}
         yield {"type": "done"}
+
+
+TITLE_PROMPT = (
+    "Write a short 3-6 word title (no quotes, no trailing punctuation) summarizing this "
+    "conversation.\n\nUser: {q}\nAssistant: {a}\n\nTitle:"
+)
+
+
+def generate_title(llm, model: str, question: str, answer: str) -> str:
+    title = ""
+    try:
+        raw = llm.complete(
+            [{"role": "user", "content": TITLE_PROMPT.format(q=question, a=answer[:500])}], model
+        )
+        title = (raw or "").strip().strip('"').splitlines()[0].strip()[:60] if raw and raw.strip() else ""
+    except Exception:
+        title = ""
+    if not title:
+        title = " ".join(question.split()[:6])
+    return title
