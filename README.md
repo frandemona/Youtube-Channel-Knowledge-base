@@ -18,8 +18,12 @@ uv run kb status ycombinator
 uv run kb ask ycombinator "How do I find a co-founder?"
 uv run kb retry ycombinator           # re-process failed/no-transcript
 uv run kb reindex ycombinator         # rebuild the index from local transcripts (e.g. after changing embedding_model)
-uv run kb web                         # open http://127.0.0.1:8000
+uv run kb web                         # dark streaming chat UI at http://127.0.0.1:8000
 ```
+
+The web chat streams answers token-by-token, renders Markdown (with syntax-highlighted code
+blocks), and lets you pick the channel from the **+** button. It loads `marked`/`DOMPurify`/
+`highlight.js` from CDN, so it needs network access (as does the agent itself).
 
 ### Changing the embedding model
 Edit `embedding_model` in `data/config.toml`, then run `uv run kb reindex <slug>`. This rebuilds
