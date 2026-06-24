@@ -27,7 +27,7 @@
 
 ::selection { background: var(--accent-soft); color: var(--accent-strong); }
 
-html { color-scheme: dark; }
+html { color-scheme: dark; height: 100%; }
 
 body {
   margin: 0;
@@ -37,14 +37,15 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 15.5px;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden; /* app-shell: the page never scrolls; sidebar + conversation scroll internally */
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 /* ---------- Shell + sidebar ---------- */
 
-#shell { display: flex; min-height: 100vh; }
+#shell { display: flex; height: 100vh; overflow: hidden; }
 
 #sidebar {
   width: 252px;
@@ -195,18 +196,23 @@ body {
 
 #app {
   flex: 1;
-  max-width: 760px;
-  margin: 0 auto;
-  min-height: 100vh;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;            /* the conversation scrolls, not this column */
   display: flex;
   flex-direction: column;
-  padding: 0 1.25rem;
+  align-items: center;         /* center the 760px chat column within the main area */
 }
+
+/* hero, messages, and composer share one centered column width (horizontal padding
+   is set per-element below to avoid being clobbered by their `padding` shorthands). */
+#hero, #messages, #composer { width: 100%; max-width: 760px; }
 
 /* ---------- Hero / empty state ---------- */
 
 #hero {
   margin-top: 20vh;
+  padding: 0 1.25rem;
   text-align: center;
   animation: hero-rise .6s cubic-bezier(.16, 1, .3, 1) both;
 }
@@ -243,11 +249,13 @@ body.chatting #hero { display: none; }
 
 #messages {
   flex: 1;
+  min-height: 0;               /* allows overflow-y to scroll within the fixed column */
   display: flex;
   flex-direction: column;
   gap: 1.6rem;
-  padding: 1.5rem 0 .5rem;
+  padding: 1.5rem 1.25rem .5rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -451,10 +459,8 @@ pre > code {
 /* ---------- Composer ---------- */
 
 #composer {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(180deg, transparent, var(--bg) 35%);
-  padding: 1.25rem 0 1.75rem;
+  flex-shrink: 0;              /* floating footer; the conversation scrolls above it */
+  padding: .85rem 1.25rem 1.4rem;
 }
 
 #bar {
