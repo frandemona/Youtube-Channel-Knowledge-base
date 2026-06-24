@@ -47,6 +47,13 @@ def test_index_has_streaming_ui(monkeypatch, tmp_path):
     assert client.get("/static/app.js").status_code == 200
 
 
+def test_index_has_sidebar(monkeypatch, tmp_path):
+    monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
+    client = TestClient(create_app())
+    html = client.get("/").text
+    assert 'id="sidebar"' in html and 'id="new-chat"' in html and 'id="conversations"' in html
+
+
 def test_ask_stream_emits_sse_events(monkeypatch, tmp_path):
     monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
 

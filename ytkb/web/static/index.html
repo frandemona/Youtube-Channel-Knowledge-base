@@ -14,31 +14,37 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
-  <main id="app">
-    <div id="hero">
-      <h1>Channel Knowledge Base</h1>
-      <p id="subtitle">Ask the channel's agent anything.</p>
-    </div>
+  <div id="shell">
+    <aside id="sidebar">
+      <button id="new-chat" type="button">+ New chat</button>
+      <div id="conversations"></div>
+    </aside>
+    <main id="app">
+      <div id="hero">
+        <h1>Channel Knowledge Base</h1>
+        <p id="subtitle">Ask the channel's agent anything.</p>
+      </div>
 
-    <div id="messages"></div>
+      <div id="messages"></div>
 
-    <div id="composer">
-      <div id="bar">
-        <div id="channel-wrap">
-          <button id="channel-btn" type="button" title="Select channel">+</button>
-          <span id="channel-label"></span>
-          <div id="channel-menu" hidden></div>
+      <div id="composer">
+        <div id="bar">
+          <div id="channel-wrap">
+            <button id="channel-btn" type="button" title="Select channel">+</button>
+            <span id="channel-label"></span>
+            <div id="channel-menu" hidden></div>
+          </div>
+          <textarea id="q" rows="1" placeholder="Ask anything …"></textarea>
+          <button id="send" type="button" title="Send">↑</button>
         </div>
-        <textarea id="q" rows="1" placeholder="Ask anything …"></textarea>
-        <button id="send" type="button" title="Send">↑</button>
+        <div id="chips">
+          <button class="chip">How do I find a co-founder?</button>
+          <button class="chip">When should I launch?</button>
+          <button class="chip">How do I talk to users?</button>
+        </div>
       </div>
-      <div id="chips">
-        <button class="chip">How do I find a co-founder?</button>
-        <button class="chip">When should I launch?</button>
-        <button class="chip">How do I talk to users?</button>
-      </div>
-    </div>
-  </main>
+    </main>
+  </div>
   <script src="/static/app.js"></script>
 </body>
 </html>
