@@ -91,7 +91,6 @@ async function ask(question) {
         status.textContent = "";
         answer += ev.text;
         body.innerHTML = md(answer);
-        enhanceCode(body);
       } else if (ev.type === "citations") {
         if (ev.citations && ev.citations.length) {
           const src = document.createElement("div");
@@ -108,6 +107,8 @@ async function ask(question) {
       bot.scrollIntoView({ block: "end" });
     }
   }
+  body.innerHTML = md(answer);
+  enhanceCode(body);
 }
 
 function send() {

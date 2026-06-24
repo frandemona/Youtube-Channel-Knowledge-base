@@ -90,6 +90,7 @@ def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max
         ]
         cited: dict[str, Citation] = {}
 
+        answered = False
         for _ in range(max_steps):
             stream = llm.stream_with_tools(messages, chat_model, specs)
             content = ""
@@ -98,6 +99,7 @@ def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max
                 yield {"type": "token", "text": token}
             tool_calls = stream.tool_calls
             if not tool_calls:
+                answered = True
                 break
             messages.append({
                 "role": "assistant",
@@ -114,6 +116,14 @@ def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max
                 result = dispatch(tc.function.name, args)
                 _collect_citations(tc.function.name, result, cited)
                 messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+        if not answered:
+            # max_steps exhausted with tools still pending: force a final tool-less answer
+            final = llm.stream_with_tools(
+                messages + [{"role": "user", "content": "Give your best final answer now using what you found."}],
+                chat_model, [])
+            for token in final:
+                yield {"type": "token", "text": token}
 
         yield {"type": "citations", "citations": [asdict(c) for c in cited.values()]}
         yield {"type": "done"}

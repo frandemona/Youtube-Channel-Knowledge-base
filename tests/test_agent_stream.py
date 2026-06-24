@@ -58,3 +58,17 @@ def test_answer_stream_emits_error_on_exception():
     events = list(answer_stream("q", "C", FakeStore(), BoomLLM(), chat_model="m", top_k=5))
     assert events[0]["type"] == "error" and "boom" in events[0]["text"]
     assert events[-1]["type"] == "done"
+
+
+def test_answer_stream_forces_final_answer_when_max_steps_exhausted():
+    class AlwaysToolsLLM:
+        def stream_with_tools(self, messages, model, tools):
+            if not tools:  # the forced final tool-less call
+                return _Stream(["Final answer."], [])
+            tc = SimpleNamespace(id="c", function=SimpleNamespace(name="keyword_search", arguments='{"query":"x"}'))
+            return _Stream([], [tc])
+
+    events = list(answer_stream("q", "C", FakeStore(), AlwaysToolsLLM(), chat_model="m", top_k=5, max_steps=2))
+    tokens = "".join(e["text"] for e in events if e["type"] == "token")
+    assert tokens == "Final answer."
+    assert events[-1]["type"] == "done"
