@@ -96,9 +96,10 @@ async function ask(question) {
         if (ev.citations && ev.citations.length) {
           const src = document.createElement("div");
           src.className = "sources";
-          src.innerHTML = "<b>Sources</b>" + ev.citations.map(
-            (c) => `<a href="${c.url}" target="_blank">${c.title} @ ${Math.floor(c.start)}s</a>`
-          ).join("");
+          // Sanitize: video titles come from YouTube (untrusted external data).
+          src.innerHTML = DOMPurify.sanitize("<b>Sources</b>" + ev.citations.map(
+            (c) => `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.title} @ ${Math.floor(c.start)}s</a>`
+          ).join(""));
           bot.appendChild(src);
         }
       } else if (ev.type === "error") {
