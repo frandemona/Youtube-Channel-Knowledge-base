@@ -48,7 +48,9 @@ body {
 #shell { display: flex; height: 100vh; overflow: hidden; }
 
 #sidebar {
-  width: 252px;
+  width: 30%;
+  min-width: 260px;
+  max-width: 420px;
   flex-shrink: 0;
   background: linear-gradient(180deg, #100f0c, #0d0c0a);
   border-right: 1px solid var(--border-soft);

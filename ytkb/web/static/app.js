@@ -66,7 +66,9 @@ async function loadConversations() {
     row.innerHTML = `<span class="conv-title">${DOMPurify.sanitize(c.title || "New chat")}</span>` +
                     `<span class="conv-badge">${DOMPurify.sanitize(c.slug)}</span>` +
                     `<button class="conv-del" title="Delete">×</button>`;
-    row.querySelector(".conv-title").onclick = () => openConversation(c.id);
+    const titleEl = row.querySelector(".conv-title");
+    titleEl.title = c.title || "New chat"; // native tooltip shows the full, overflowing title
+    titleEl.onclick = () => openConversation(c.id);
     row.querySelector(".conv-badge").onclick = () => openConversation(c.id);
     row.querySelector(".conv-del").onclick = async (e) => {
       e.stopPropagation();
