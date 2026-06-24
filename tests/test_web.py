@@ -37,6 +37,16 @@ def test_index_served(monkeypatch, tmp_path):
     assert "<html" in r.text.lower()
 
 
+def test_index_has_streaming_ui(monkeypatch, tmp_path):
+    monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
+    client = TestClient(create_app())
+    html = client.get("/").text
+    assert 'id="messages"' in html and 'id="channel-btn"' in html
+    assert "/static/app.js" in html
+    # static asset is served
+    assert client.get("/static/app.js").status_code == 200
+
+
 def test_ask_stream_emits_sse_events(monkeypatch, tmp_path):
     monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
 
