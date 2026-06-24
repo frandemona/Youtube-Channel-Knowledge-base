@@ -35,3 +35,49 @@ def test_index_served(monkeypatch, tmp_path):
     r = client.get("/")
     assert r.status_code == 200
     assert "<html" in r.text.lower()
+
+
+def test_ask_stream_emits_sse_events(monkeypatch, tmp_path):
+    monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
+
+    class FakeCtx:
+        store = object()
+        llm = object()
+
+    from ytkb.channel import ChannelInfo, ChannelFilters
+    info = ChannelInfo("UC1", "@yc", "Y Combinator", "u")
+    monkeypatch.setattr(webapp.sync, "build_context", lambda cfg, slug: FakeCtx())
+    monkeypatch.setattr(webapp.sync, "load_channel", lambda cfg, slug: (info, ChannelFilters()))
+    monkeypatch.setattr(webapp.agent, "answer_stream", lambda *a, **k: iter([
+        {"type": "status", "text": "Searching transcripts…"},
+        {"type": "token", "text": "Hello"},
+        {"type": "citations", "citations": [{"video_id": "v1", "title": "T", "start": 1.0,
+                                             "url": "https://youtu.be/v1?t=1"}]},
+        {"type": "done"},
+    ]))
+    client = TestClient(create_app())
+    r = client.post("/api/ask/stream", json={"slug": "yc", "question": "how?"})
+    assert r.status_code == 200
+    body = r.text
+    assert 'data: {"type": "status"' in body
+    assert '"text": "Hello"' in body
+    assert "youtu.be/v1?t=1" in body
+    assert '"type": "done"' in body
+
+
+def test_ask_stream_no_api_key_emits_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("YTKB_DATA_DIR", str(tmp_path))
+
+    class NoLLMCtx:
+        store = object()
+        llm = None
+
+    from ytkb.channel import ChannelInfo, ChannelFilters
+    info = ChannelInfo("UC1", "@yc", "Y Combinator", "u")
+    monkeypatch.setattr(webapp.sync, "build_context", lambda cfg, slug: NoLLMCtx())
+    monkeypatch.setattr(webapp.sync, "load_channel", lambda cfg, slug: (info, ChannelFilters()))
+    client = TestClient(create_app())
+    r = client.post("/api/ask/stream", json={"slug": "yc", "question": "how?"})
+    assert r.status_code == 200
+    assert '"type": "error"' in r.text
+    assert "OPENROUTER_API_KEY" in r.text
