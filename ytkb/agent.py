@@ -1,4 +1,5 @@
 import json
+from dataclasses import asdict
 
 from .models import Answer, Citation
 from .retrieval import build_tools
@@ -63,3 +64,59 @@ def _collect_citations(tool_name: str, result: str, cited: dict) -> None:
                 video_id=vid, title=r.get("title", ""), start=float(start),
                 url=f"https://youtu.be/{vid}?t={int(start)}",
             )
+
+
+def _status_for(name: str, args_json: str) -> str:
+    try:
+        args = json.loads(args_json or "{}")
+    except (json.JSONDecodeError, TypeError):
+        args = {}
+    if name in ("keyword_search", "semantic_search"):
+        q = args.get("query", "")
+        return f"Searching transcripts for '{q}'…" if q else "Searching transcripts…"
+    if name == "read_transcript":
+        return f"Reading {args.get('video_id', 'a video')}…"
+    if name == "list_videos":
+        return "Listing videos…"
+    return "Working…"
+
+
+def answer_stream(question, channel_title, store, llm, *, chat_model, top_k, max_steps=5):
+    try:
+        specs, dispatch = build_tools(store, top_k)
+        messages = [
+            {"role": "system", "content": SYSTEM.format(channel=channel_title)},
+            {"role": "user", "content": question},
+        ]
+        cited: dict[str, Citation] = {}
+
+        for _ in range(max_steps):
+            stream = llm.stream_with_tools(messages, chat_model, specs)
+            content = ""
+            for token in stream:
+                content += token
+                yield {"type": "token", "text": token}
+            tool_calls = stream.tool_calls
+            if not tool_calls:
+                break
+            messages.append({
+                "role": "assistant",
+                "content": content or None,
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in tool_calls
+                ],
+            })
+            for tc in tool_calls:
+                yield {"type": "status", "text": _status_for(tc.function.name, tc.function.arguments)}
+                args = json.loads(tc.function.arguments or "{}")
+                result = dispatch(tc.function.name, args)
+                _collect_citations(tc.function.name, result, cited)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+        yield {"type": "citations", "citations": [asdict(c) for c in cited.values()]}
+        yield {"type": "done"}
+    except Exception as e:
+        yield {"type": "error", "text": str(e)}
+        yield {"type": "done"}
