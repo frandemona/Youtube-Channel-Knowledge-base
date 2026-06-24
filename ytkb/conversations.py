@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS messages (
     citations_json TEXT,
     created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS ix_messages_conv ON messages(conversation_id);
 """
 
 

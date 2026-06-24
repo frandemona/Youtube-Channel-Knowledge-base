@@ -51,21 +51,30 @@ def create_app(cfg=None) -> FastAPI:
     @app.get("/api/conversations")
     def conversations_list():
         conn = cv.connect((cfg or load_config()).data_dir)
-        return {"conversations": cv.list_conversations(conn)}
+        try:
+            return {"conversations": cv.list_conversations(conn)}
+        finally:
+            conn.close()
 
     @app.get("/api/conversations/{cid}")
     def conversation_get(cid: int):
         conn = cv.connect((cfg or load_config()).data_dir)
-        conv = cv.get_conversation(conn, cid)
-        if conv is None:
-            raise HTTPException(status_code=404, detail="not found")
-        return conv
+        try:
+            conv = cv.get_conversation(conn, cid)
+            if conv is None:
+                raise HTTPException(status_code=404, detail="not found")
+            return conv
+        finally:
+            conn.close()
 
     @app.delete("/api/conversations/{cid}")
     def conversation_delete(cid: int):
         conn = cv.connect((cfg or load_config()).data_dir)
-        cv.delete_conversation(conn, cid)
-        return {"ok": True}
+        try:
+            cv.delete_conversation(conn, cid)
+            return {"ok": True}
+        finally:
+            conn.close()
 
     @app.post("/api/ask/stream")
     def ask_stream(req: AskReq):
@@ -80,6 +89,7 @@ def create_app(cfg=None) -> FastAPI:
         info, _ = sync.load_channel(c, slug)
         ctx = sync.build_context(c, slug)
         if ctx.llm is None:
+            conn.close()
             return StreamingResponse(_sse(iter([
                 {"type": "error", "text": "No OPENROUTER_API_KEY configured in data/.env"},
                 {"type": "done"},
@@ -91,28 +101,31 @@ def create_app(cfg=None) -> FastAPI:
         cv.add_message(conn, conv_id, "user", req.question)
 
         def gen():
-            if is_new:
-                yield {"type": "conversation", "id": conv_id}
-            answer_text, citations, errored = "", [], False
-            for ev in agent.answer_stream(req.question, info.title, ctx.store, ctx.llm,
-                                          chat_model=c.chat_model, top_k=c.top_k, history=history):
-                t = ev["type"]
-                if t == "token":
-                    answer_text += ev["text"]
-                elif t == "citations":
-                    citations = ev["citations"]
-                elif t == "error":
-                    errored = True
-                if t == "done":
-                    if not errored:
-                        cv.add_message(conn, conv_id, "assistant", answer_text, citations)
-                        if not had_title:
-                            title = agent.generate_title(ctx.llm, c.chat_model, req.question, answer_text)
-                            cv.set_title(conn, conv_id, title)
-                            yield {"type": "title", "text": title}
-                    yield ev
-                else:
-                    yield ev
+            try:
+                if is_new:
+                    yield {"type": "conversation", "id": conv_id}
+                answer_text, citations, errored = "", [], False
+                for ev in agent.answer_stream(req.question, info.title, ctx.store, ctx.llm,
+                                              chat_model=c.chat_model, top_k=c.top_k, history=history):
+                    t = ev["type"]
+                    if t == "token":
+                        answer_text += ev["text"]
+                    elif t == "citations":
+                        citations = ev["citations"]
+                    elif t == "error":
+                        errored = True
+                    if t == "done":
+                        if not errored:
+                            cv.add_message(conn, conv_id, "assistant", answer_text, citations)
+                            if not had_title:
+                                title = agent.generate_title(ctx.llm, c.chat_model, req.question, answer_text)
+                                cv.set_title(conn, conv_id, title)
+                                yield {"type": "title", "text": title}
+                        yield ev
+                    else:
+                        yield ev
+            finally:
+                conn.close()
 
         return StreamingResponse(_sse(gen()), media_type="text/event-stream")
 
