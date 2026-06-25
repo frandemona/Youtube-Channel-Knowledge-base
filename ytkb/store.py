@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import lancedb
 
 from .db import clear_all_chunks, delete_video_chunks, insert_chunks
@@ -61,6 +63,19 @@ class ChannelStore:
         if TABLE in self._db.table_names():
             self._db.drop_table(TABLE)
         clear_all_chunks(self.conn)
+
+    def optimize(self) -> None:
+        """Compact the LanceDB table (each add appends a fragment) and prune old
+        versions, so the table's file/fd count stays bounded as the channel grows.
+        Without the cleanup threshold, compaction leaves old version files behind
+        (e.g. a 447-file table compacts to ~7). Best-effort: never fail a sync."""
+        table = self._table()
+        if table is None:
+            return
+        try:
+            table.optimize(cleanup_older_than=timedelta(seconds=0))
+        except Exception:
+            pass
 
     def keyword_search(self, query: str, k: int) -> list[ChunkHit]:
         match = _fts_query(query)

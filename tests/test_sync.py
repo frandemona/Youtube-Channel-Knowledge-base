@@ -224,3 +224,15 @@ def test_sync_reprocesses_stranded_intermediate_state(tmp_path):
     # empty listing: the stranded video isn't in the channel listing, only in the DB
     sync.sync_channel(cfg, slug, lister=lambda url, f, **k: [], process=fake_process)
     assert "a" in processed
+
+
+def test_sync_optimizes_store(monkeypatch, tmp_path):
+    # sync should compact the LanceDB table at the end of a run.
+    from ytkb.store import ChannelStore
+    calls = []
+    monkeypatch.setattr(ChannelStore, "optimize", lambda self: calls.append(1))
+    cfg = load_config(tmp_path)
+    slug = sync.add_channel(cfg, "u", ChannelFilters(), resolver=lambda url, **k: info())
+    sync.sync_channel(cfg, slug, lister=lambda url, f, **k: [],
+                      process=lambda ctx, meta, **k: VideoState.INDEXED)
+    assert calls

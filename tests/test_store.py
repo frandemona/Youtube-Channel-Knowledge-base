@@ -102,3 +102,11 @@ def test_keyword_search_escapes_fts_special_syntax(tmp_path):
     assert isinstance(store.keyword_search("How do I find a co-founder?", 5), list)
     # Escaping must not break a normal matching term.
     assert store.keyword_search("cofounder", 5)[0].video_id == "v1"
+
+
+def test_optimize_runs_and_preserves_data(tmp_path):
+    # Compaction must not raise and must keep the data searchable.
+    store = build_store(tmp_path)
+    store.optimize()
+    assert store.keyword_search("cofounder", 5)[0].video_id == "v1"
+    assert len(store.semantic_search("cofounder", 1)) == 1

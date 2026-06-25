@@ -99,6 +99,7 @@ def sync_channel(cfg, slug, *, dry_run=False, lister=None, process=None) -> RunS
         results.append(process(ctx, meta))
     s = _summarize(results)
     s.new = summary.new
+    ctx.store.optimize()
     record_run(ctx.conn, s, "sync")
     return s
 
@@ -113,6 +114,7 @@ def retry_channel(cfg, slug, *, process=None) -> RunSummary:
         meta = VideoMeta(row["video_id"], row["title"], row["duration"], row["upload_date"], row["url"])
         results.append(process(ctx, meta))
     s = _summarize(results)
+    ctx.store.optimize()
     record_run(ctx.conn, s, "retry")
     return s
 
@@ -161,5 +163,6 @@ def reindex_channel(cfg, slug, *, process=None) -> RunSummary:
             summary.skipped += 1
         else:
             summary.failed += 1
+    ctx.store.optimize()
     record_run(ctx.conn, summary, "reindex")
     return summary

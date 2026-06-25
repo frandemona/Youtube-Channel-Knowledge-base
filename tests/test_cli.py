@@ -64,3 +64,14 @@ def test_reindex_invokes_sync(monkeypatch, tmp_path):
     assert captured["slug"] == "y-combinator"
     assert "reindexed=3" in result.stdout
     assert "skipped=1" in result.stdout
+
+
+def test_target_fd_limit():
+    import resource
+    from ytkb.cli import _target_fd_limit, FD_TARGET
+    # below target -> returns the higher soft limit to set
+    assert _target_fd_limit(256, 1_000_000) == 1_000_000
+    # already at/above target -> None (no change)
+    assert _target_fd_limit(FD_TARGET, FD_TARGET) is None
+    # infinite hard limit -> capped at FD_TARGET
+    assert _target_fd_limit(256, resource.RLIM_INFINITY) == FD_TARGET

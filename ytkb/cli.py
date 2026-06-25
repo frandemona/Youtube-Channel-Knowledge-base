@@ -4,7 +4,42 @@ from . import sync, agent
 from .channel import ChannelFilters
 from .config import load_config
 
+try:
+    import resource
+except ImportError:  # non-Unix
+    resource = None
+
 app = typer.Typer(help="YouTube channel knowledge base")
+
+FD_TARGET = 1_048_576
+
+
+def _target_fd_limit(soft, hard):
+    """The soft fd limit to raise to (or None if no change is needed)."""
+    cap = hard if hard != resource.RLIM_INFINITY else FD_TARGET
+    target = min(FD_TARGET, cap)
+    return target if soft < target else None
+
+
+def _raise_fd_limit():
+    # LanceDB opens many fragment files for a channel's vector table; a default
+    # macOS Terminal soft limit (256) causes "Too many open files" on large
+    # channels. Raise the soft limit toward the hard limit before any command.
+    if resource is None:
+        return
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = _target_fd_limit(soft, hard)
+        if target is not None:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except (ValueError, OSError):
+        pass
+
+
+@app.callback()
+def _startup():
+    """Runs before every command."""
+    _raise_fd_limit()
 
 
 @app.command()
