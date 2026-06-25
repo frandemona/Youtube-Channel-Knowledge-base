@@ -29,6 +29,14 @@ Conversations are saved to `data/conversations.db`: the sidebar lists every chat
 channels), **New chat** starts a fresh one, and opening a past chat resumes it (follow-up
 questions use the prior turns). A chat's channel is fixed when it's created.
 
+### Long syncs
+Backfilling a large channel can take a while (hundreds of videos). Keep the Mac awake for the
+whole run — sleeping mid-sync can stall the network calls (yt-dlp, SponsorBlock) — by wrapping
+it in `caffeinate`:
+```bash
+caffeinate -i uv run kb sync ycombinator
+```
+
 ### Changing the embedding model
 Edit `embedding_model` in `data/config.toml`, then run `uv run kb reindex <slug>`. This rebuilds
 the vector index from the cleaned transcripts already on disk — no re-download, no LLM calls.
