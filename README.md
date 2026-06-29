@@ -1,16 +1,44 @@
-# YouTube Channel Knowledge Base (`ytkb`)
+# ytkb · YouTube Channel Knowledge Base
 
-Local tool: ingest a YouTube channel's transcripts, strip sponsor reads, and ask a
-per-channel agent questions with citations.
+> Turn any YouTube channel into a local, searchable knowledge base you can chat with.
+
+Point `ytkb` at a channel and it downloads every video's transcript, strips the sponsor reads,
+and indexes it on your machine. Then you ask a per-channel agent questions and get answers
+grounded in what the videos actually said — with clickable citations back to the exact moment in
+each video. Everything is local except the chat model, which goes through OpenRouter (any model,
+swappable).
+
+![ytkb web chat](docs/ytkb.gif)
+
+## What it does
+
+- **Ingest a channel** — list its videos, fetch captions the cheap way (`yt-dlp`), and store them locally.
+- **Strip the ads** — remove in-video sponsor segments (SponsorBlock, with an LLM fallback).
+- **Ask questions** — a per-channel agent does keyword + semantic search over the transcripts and answers with citations (`video @ m:ss`).
+- **Stay local** — embeddings, vector index, and storage all live on disk; only the answer model calls out.
+
+## Features
+
+- 📥 **Cheap ingestion** — captions via `yt-dlp` (creator subs › auto-captions › local Whisper fallback). No paid transcription.
+- ✂️ **Ad removal** — SponsorBlock first; a cheap LLM pass for videos it doesn't cover.
+- 🔎 **Agentic hybrid RAG** — the agent calls real tools: keyword search (SQLite FTS5), semantic search (LanceDB), read-transcript, list-videos. It searches, reads, and cites.
+- 🔌 **Swappable models** — any OpenRouter model via `config.toml`; embeddings run locally (`fastembed`).
+- 💬 **CLI + web chat** — a `kb` command line for sync/admin, plus a dark streaming web UI with Markdown, code blocks, and saved conversations.
+- ♻️ **Incremental & resumable** — a per-video state machine tracks progress; `sync` only does new/failed work, `retry` re-runs failures, `reindex` rebuilds offline. Back up by copying a folder.
 
 ## Setup
+
 ```bash
 uv sync
 echo "OPENROUTER_API_KEY=sk-..." > data/.env
-cp data/config.toml.example data/config.toml   # optional
+cp data/config.toml.example data/config.toml   # optional: change models, chunking, language
 ```
 
+Needs Python 3.12, [uv](https://docs.astral.sh/uv/), `ffmpeg` (for the Whisper fallback), and an
+[OpenRouter](https://openrouter.ai) API key. macOS/Linux.
+
 ## Usage
+
 ```bash
 uv run kb add "https://www.youtube.com/@ycombinator" --no-shorts --name ycombinator
 uv run kb sync ycombinator            # add --dry-run to preview
@@ -42,4 +70,19 @@ Edit `embedding_model` in `data/config.toml`, then run `uv run kb reindex <slug>
 the vector index from the cleaned transcripts already on disk — no re-download, no LLM calls.
 Switching embedding models requires a reindex because the vector dimension changes.
 
-Data lives under `data/channels/<slug>/`. Back up by copying `data/`.
+## How it works
+
+**Ingestion** (per video, incremental, resumable):
+`resolve channel → list videos → fetch captions (creator subs › auto › Whisper) → strip ads
+(SponsorBlock › LLM) → chunk with timestamps → index into SQLite FTS5 + LanceDB`. Each video moves
+through a state machine, so an interrupted sync resumes and only retries what failed.
+
+**Querying:** a tool-using agent on OpenRouter searches the channel's index (keyword + semantic),
+reads transcript context, and writes an answer with citations. Each channel is isolated under
+`data/channels/<slug>/` (its own transcripts, SQLite DB, and vector table), so back up or move a
+channel by copying its folder.
+
+## Tech
+
+Python 3.12 · `yt-dlp` · SponsorBlock · `faster-whisper` · `fastembed` (local embeddings) ·
+LanceDB · SQLite + FTS5 · OpenRouter (via the `openai` SDK) · Typer (CLI) · FastAPI (web).
