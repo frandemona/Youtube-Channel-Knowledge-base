@@ -87,3 +87,33 @@ def test_pipeline_adstrip_failure_sets_failed_embed(tmp_path):
     state = process_video(ctx, meta(), fetch=lambda vid, langs: segs, strip=boom_strip)
     assert state == VideoState.FAILED_EMBED
     assert get_video(ctx.conn, "v1")["state"] == "failed_embed"
+
+
+def test_pipeline_fetch_error_falls_through_to_whisper(tmp_path):
+    # A caption-fetch error (e.g. HTTP 429 on an auto-translated track) must fall
+    # through to Whisper when enabled, not dead-end at FAILED_FETCH.
+    ctx = make_ctx(tmp_path, whisper_enabled=True)
+    upsert_video(ctx.conn, meta())
+    segs = [Segment(0, 5, "english audio transcribed by whisper")]
+
+    def boom_fetch(vid, langs):
+        raise RuntimeError("HTTP Error 429: Too Many Requests")
+
+    state = process_video(ctx, meta(), fetch=boom_fetch,
+                          whisper=lambda vid, model: segs,
+                          strip=lambda vid, s, llm, cfg, **k: (s, "none"))
+    assert state == VideoState.INDEXED
+    assert get_video(ctx.conn, "v1")["state"] == "indexed"
+
+
+def test_pipeline_fetch_error_whisper_disabled_is_failed_fetch(tmp_path):
+    # With Whisper disabled, a caption-fetch error stays retryable (FAILED_FETCH).
+    ctx = make_ctx(tmp_path, whisper_enabled=False)
+    upsert_video(ctx.conn, meta())
+
+    def boom_fetch(vid, langs):
+        raise RuntimeError("HTTP Error 429")
+
+    state = process_video(ctx, meta(), fetch=boom_fetch)
+    assert state == VideoState.FAILED_FETCH
+    assert "429" in get_video(ctx.conn, "v1")["last_error"]

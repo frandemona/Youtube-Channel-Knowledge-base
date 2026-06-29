@@ -26,16 +26,19 @@ def process_video(ctx: ChannelContext, meta: VideoMeta, *, fetch=None, whisper=N
     strip = strip or adstrip.strip_ads
     vid = meta.video_id
 
-    # 1. transcript
+    # 1. transcript: try captions; if they're absent OR the fetch errors
+    # (e.g. HTTP 429 on an auto-translated track), fall through to Whisper.
+    fetch_error = None
     try:
         segments = fetch(vid, ctx.cfg.languages)
-    except Exception as e:  # network / extraction failure -> retryable
-        set_state(ctx.conn, vid, VideoState.FAILED_FETCH, error=str(e))
-        return VideoState.FAILED_FETCH
+    except Exception as e:  # caption fetch/extraction failure
+        segments = None
+        fetch_error = str(e)
 
     if segments:
         set_state(ctx.conn, vid, VideoState.TRANSCRIPT_FETCHED)
     elif ctx.whisper_enabled:
+        # No usable captions (none available, or the fetch errored) -> transcribe the audio.
         try:
             segments = whisper(vid, ctx.cfg.whisper_model)
         except Exception as e:
@@ -45,6 +48,10 @@ def process_video(ctx: ChannelContext, meta: VideoMeta, *, fetch=None, whisper=N
             set_state(ctx.conn, vid, VideoState.NO_TRANSCRIPT, error="whisper produced nothing")
             return VideoState.NO_TRANSCRIPT
         set_state(ctx.conn, vid, VideoState.WHISPER_TRANSCRIBED)
+    elif fetch_error:
+        # Captions errored and Whisper is disabled -> keep it retryable.
+        set_state(ctx.conn, vid, VideoState.FAILED_FETCH, error=fetch_error)
+        return VideoState.FAILED_FETCH
     else:
         set_state(ctx.conn, vid, VideoState.NO_TRANSCRIPT, error="no captions; whisper disabled")
         return VideoState.NO_TRANSCRIPT
